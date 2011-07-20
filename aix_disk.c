@@ -1,9 +1,32 @@
+/******************************************************************************
+*
+* This program monitors the disk queues on AIX and posts the statistics to ganglia
+* via gmetric binary
+*
+* Most of the code was provided by nagger:-
+*    
+*     http://www.ibm.com/developerworks/wikis/display/WikiPtype/ryo
+*
+* All I've added is the pid output/check, gmetric function and adjusted frequency
+*
+* Version 0.1:	21/07/2001
+*		- initial version
+*
+*
+*
+* TODO - Look at converting to gmond c module - HELP Required!
+*
+*
+******************************************************************************/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
 #include <libperfstat.h>
 #include <sys/systemcfg.h>
+
+static int already_running;
 
 /* See /usr/include/sys/iplcb.h to explain the below */
 #define XINTFRAC        ((double)(_system_configuration.Xint)/(double)(_system_configuration.Xfrac))
@@ -28,7 +51,7 @@ float   metric_value;
         FILE *f;
 
         sprintf(gmetric_command, "/opt/freeware/bin/gmetric --name=%s_%s --value=%0.1f --type=int32 --dmax=60", metric_name, metric_name_append, metric_value);
-        /* printf("The following stats will be posted - %-16s\n",gmetric_command); */
+        printf("The following stats will be posted - %-16s\n",gmetric_command);
 
         f = popen( gmetric_command, "r");
         status = pclose(f);
@@ -63,21 +86,39 @@ int main(int argc, char* argv[])
         perfstat_disk_t *b;
         perfstat_id_t name;
         char *substring;
-        int elapsed=1;
+        int running_pid;
+        int elapsed=15;
         int ncpus;
         pid_t pid, ppid;
         gid_t gid;
-        FILE *pid_file;
+        FILE *fcheck, *pid_file;
 
-        /* get the process id */
-        if ((pid = getpid()) < 0) {
-                perror("unable to get pid");
-        } else {
-                pid_file=fopen("/var/run/gmond_iostats.pid", "w+");
-                fprintf(pid_file, "%d", pid);
-                fclose(pid_file);
+        /* find out if we are already running via pid file */
+        fcheck = fopen( "/var/run/gmond_iostats.pid", "r" );
+
+        if (fcheck)
+        {
+                already_running = 1;
+                fscanf(fcheck,"%d",&running_pid);
+                fclose( fcheck );
+                        if (kill(running_pid, 0) == 0)
+                        {
+                                printf("The program is already running, pid %d\n", running_pid );
+                                exit(1);
+                        } else
+                                printf("Stale pid file exists, please remove\n");
+                                exit(1);
+
+        } else
+                already_running = 0;
+                /* get the process id */
+                if ((pid = getpid()) < 0) {
+                        perror("unable to get pid");
+                } else {
+                        pid_file=fopen("/var/run/gmond_iostats.pid", "w+");
+                        fprintf(pid_file, "%d", pid);
+                        fclose(pid_file);
         }
-
 
         /* get the number of CPUs */
         ncpus=perfstat_cpu(NULL, NULL, sizeof(perfstat_cpu_t), 0);
@@ -104,7 +145,7 @@ int main(int argc, char* argv[])
         }
 
         for(;;) {
-#define DELTA(member) (b[i].member - a[i].member)
+        #define DELTA(member) (b[i].member - a[i].member)
                 sleep(elapsed);
                 strcpy(name.name,FIRST_DISK);
                 ret = perfstat_disk(&name, b, sizeof(perfstat_disk_t), disks);
@@ -115,7 +156,7 @@ int main(int argc, char* argv[])
                 }
 
                 for (i = 0; i < ret; i++) {
-#define NONZERO(x) ((x)?(x):1)
+                #define NONZERO(x) ((x)?(x):1)
                         call_gmetric_float(fix(b[i].name), "avgtime", (double)(HWTICS2MSECS(DELTA(wq_time))/NONZERO(DELTA(xfers))/elapsed));
                         call_gmetric_float(fix(b[i].name), "avgWQsz", (double)(DELTA(wq_sampled))/(100.0*(double)elapsed*(double)ncpus));
                         call_gmetric_float(fix(b[i].name), "avgSQsz", (double)(DELTA(q_sampled))/(100.0*(double)elapsed*(double)ncpus));
