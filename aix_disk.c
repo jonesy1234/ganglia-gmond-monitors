@@ -52,7 +52,7 @@ float   metric_value;
         FILE *f;
 
         sprintf(gmetric_command, "/opt/freeware/bin/gmetric --name=%s_%s --value=%0.1f --type=int32 --dmax=60", metric_name, metric_name_append, metric_value);
-        printf("The following stats will be posted - %-16s\n",gmetric_command);
+        /* printf("The following stats will be posted - %-16s\n",gmetric_command); */
 
         f = popen( gmetric_command, "r");
         status = pclose(f);
