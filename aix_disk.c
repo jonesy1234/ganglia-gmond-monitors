@@ -11,6 +11,7 @@
 *
 * Version 0.1:	21/07/2001
 *		- initial version
+*		- Metrics posted to ganglia every 15 seconds
 *
 *
 *
