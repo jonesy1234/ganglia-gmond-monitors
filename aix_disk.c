@@ -107,7 +107,8 @@ int main(int argc, char* argv[])
                                 printf("The program is already running, pid %d\n", running_pid );
                                 exit(1);
                         } else
-                                printf("Stale pid file exists, please remove\n");
+				printf("Stale pid file exists removing, please execute again\n");
+			        remove("/var/run/gmond_iostats.pid");
                                 exit(1);
 
         } else
