@@ -104,8 +104,8 @@ int main(int argc, char* argv[])
                 fclose( fcheck );
                         if (kill(running_pid, 0) == 0)
                         {
-                                printf("The program is already running, pid %d\n", running_pid );
-                                exit(1);
+                                /* printf("The program is already running, pid %d\n", running_pid ); */
+                                exit(0);
                         } else
 				printf("Stale pid file exists removing, please execute again\n");
 			        remove("/var/run/gmond_iostats.pid");
